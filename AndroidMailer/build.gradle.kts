@@ -32,8 +32,10 @@ android {
     }
 
     packaging {
-        resources.pickFirsts += "META-INF/LICENSE.md"
-        resources.pickFirsts += "META-INF/NOTICE.md"
+        resources {
+            pickFirsts += "META-INF/LICENSE.md"
+            pickFirsts += "META-INF/NOTICE.md"
+        }
     }
 }
 
@@ -51,4 +53,27 @@ dependencies {
     implementation("org.eclipse.angus:jakarta.mail:2.0.2")
     implementation("org.eclipse.angus:angus-activation:2.0.1")
     implementation("jakarta.activation:jakarta.activation-api:2.1.2")
+
+
+    // WorkManager
+    val workVersion = "2.9.0"
+
+    // (Java only)
+    implementation("androidx.work:work-runtime:$workVersion")
+
+    // Kotlin + coroutines
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
+
+    // optional - RxJava2 support
+    implementation("androidx.work:work-rxjava2:$workVersion")
+
+    // optional - GCMNetworkManager support
+    implementation("androidx.work:work-gcm:$workVersion")
+
+    // optional - Test helpers
+    androidTestImplementation("androidx.work:work-testing:$workVersion")
+
+    // optional - Multiprocess support
+    implementation("androidx.work:work-multiprocess:$workVersion")
+
 }
