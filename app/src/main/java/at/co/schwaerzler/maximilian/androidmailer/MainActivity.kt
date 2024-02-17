@@ -1,5 +1,6 @@
 package at.co.schwaerzler.maximilian.androidmailer
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import at.co.schwaerzler.maximilian.androidmailer.ui.theme.AndroidMailerTheme
@@ -50,7 +52,7 @@ fun MainScreen() {
         mutableStateOf("")
     }
 
-    fun sendEmail(to: String) {
+    fun sendEmail(context: Context, to: String) {
         val emailSender = AndroidMailer.Builder()
             .from("Max S. <maschwaerzler@a1.net>")
             .to(to)
@@ -61,7 +63,7 @@ fun MainScreen() {
             .body("This is a test")
             .build()
 
-        emailSender.send(BuildConfig.username, BuildConfig.password)
+        emailSender.send(context, BuildConfig.username, BuildConfig.password)
     }
 
     Scaffold { paddingValues ->
@@ -73,6 +75,7 @@ fun MainScreen() {
                 .padding(16.dp),
             Arrangement.spacedBy(8.dp)
         ) {
+            val context = LocalContext.current
             TextField(
                 email,
                 { email = it },
@@ -86,7 +89,7 @@ fun MainScreen() {
             )
 
             Button(onClick = {
-                sendEmail(email)
+                sendEmail(context, email)
             }, Modifier.fillMaxWidth()) {
                 Text("Send Email")
             }

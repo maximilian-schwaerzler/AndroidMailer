@@ -1,13 +1,23 @@
 package at.co.schwaerzler.maximilian.androidmailer
 
+import android.content.Context
 import android.util.Log
-import jakarta.mail.Message
-import jakarta.mail.Session
-import jakarta.mail.Transport
-import jakarta.mail.internet.InternetAddress
-import jakarta.mail.internet.MimeMessage
-import java.util.Properties
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkManager
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToStream
+import java.io.File
+import java.nio.file.Path
+import java.util.Date
+import java.util.UUID
+import kotlin.io.path.name
 
+@Serializable
 class AndroidMailer private constructor(
     val from: String,
     val to: String,
@@ -15,26 +25,36 @@ class AndroidMailer private constructor(
     val body: String,
     val smtpServer: String,
     val smtpPort: Int,
-    val useStartTLS: Boolean
+    val useStartTLS: Boolean,
+    val attachments: List<AndroidMailerAttachment>
 ) {
 
-    fun send(username: String, password: String) {
-        MAIL_PROPERTIES.setProperty("mail.smtp.host", smtpServer)
-        MAIL_PROPERTIES.setProperty("mail.smtp.port", smtpPort.toString())
-        MAIL_PROPERTIES.setProperty("mail.smtp.starttls.enable", useStartTLS.toString())
+    @OptIn(ExperimentalSerializationApi::class)
+    fun send(context: Context, username: String, password: String) {
+        val timestamp = Date().time
+        val fileName = "mail_$timestamp"
+        val mailFile = File(context.cacheDir, fileName)
+        Json.encodeToStream(this, mailFile.outputStream())
 
-        val message = MimeMessage(Session.getDefaultInstance(MAIL_PROPERTIES))
-        message.setFrom(from)
-        message.addRecipient(Message.RecipientType.TO, InternetAddress(to))
-        message.subject = subject
-        message.setText(body)
-        Transport.send(message, username, password)
-        Log.d(LOG_TAG, "Email sent from $from to $to")
+        val workerData = Data.Builder()
+        workerData.putString("mailData", mailFile.toString())
+        workerData.putString("username", username)
+        workerData.putString("password", password)
+
+        val emailWorkerBuilder = OneTimeWorkRequestBuilder<EmailSender>()
+        emailWorkerBuilder.setInputData(workerData.build())
+        emailWorkerBuilder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+        val emailWorker = emailWorkerBuilder.build()
+
+        val emailWorkerId = emailWorker.id
+        val workManager = WorkManager.getInstance(context)
+        workManager.enqueue(emailWorker)
+        Log.d(LOG_TAG, "Enqueued worker with id $emailWorkerId")
+
+//        workManager.getWorkInfoById(emailWorkerId)
     }
 
     companion object {
-        private val MAIL_PROPERTIES = Properties()
-
         private const val LOG_TAG = "AndroidMailer"
     }
 
@@ -43,10 +63,6 @@ class AndroidMailer private constructor(
      * Use [build] to retrieve an instance of [AndroidMailer]
      */
     class Builder {
-        /**
-         * The email address from which the email is sent from.
-         * Either a plain email address (e.g. `john.doe@example.com`) or with a display name (e.g. `John Doe <john.doe@example.com>`).
-         */
         var from: String? = null
             private set
 
@@ -73,6 +89,30 @@ class AndroidMailer private constructor(
 
         fun body(body: String) = apply {
             this.body = body
+        }
+
+        val attachments: MutableList<AndroidMailerAttachment> = mutableListOf()
+
+        fun attachment(filePath: Path) = apply {
+            customAttachment(AndroidMailerAttachment(filePath, filePath.name))
+        }
+
+        fun customAttachment(attachment: AndroidMailerAttachment) = apply {
+            if (!attachment.filePath.toFile().isFile) {
+                throw IllegalArgumentException("Attachment has to be a file, not a directory")
+            }
+            this.attachments.add(attachment)
+        }
+
+        fun attachments(filePaths: List<Path>) = apply {
+            customAttachments(filePaths.map { AndroidMailerAttachment(it, it.name) })
+        }
+
+        fun customAttachments(attachments: List<AndroidMailerAttachment>) = apply {
+            if (attachments.any { !it.filePath.toFile().isFile }) {
+                throw IllegalArgumentException("Attachment have to be files, not directories")
+            }
+            this.attachments.addAll(attachments)
         }
 
         var smtpServer: String? = null
@@ -102,7 +142,16 @@ class AndroidMailer private constructor(
             requireNotNull(smtpServer) { "SMTP server is undefined" }
             requireNotNull(smtpPort) { "SMTP port is undefined" }
 
-            return AndroidMailer(from!!, to!!, subject, body, smtpServer!!, smtpPort!!, useStartTLS)
+            return AndroidMailer(
+                from!!,
+                to!!,
+                subject,
+                body,
+                smtpServer!!,
+                smtpPort!!,
+                useStartTLS,
+                attachments
+            )
         }
     }
 }
