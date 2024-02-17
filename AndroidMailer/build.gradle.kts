@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("maven-publish")
     kotlin("plugin.serialization")
 }
 
@@ -36,6 +37,19 @@ android {
         resources {
             pickFirsts += "META-INF/LICENSE.md"
             pickFirsts += "META-INF/NOTICE.md"
+        }
+    }
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components.getByName("release"))
+                groupId = "at.co.schwaerzler.maximilian"
+                artifactId = "androidmailer"
+                version = "0.0.1"
+            }
         }
     }
 }
