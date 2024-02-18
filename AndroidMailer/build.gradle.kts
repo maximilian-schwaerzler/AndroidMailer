@@ -45,7 +45,7 @@ afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
-                from(components.getByName("release"))
+                from(components["java"])
                 groupId = "at.co.schwaerzler.maximilian"
                 artifactId = "androidmailer"
                 version = "0.0.1"
